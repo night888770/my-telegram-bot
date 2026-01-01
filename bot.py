@@ -3,7 +3,20 @@ import logging
 import threading
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+import subprocess
 
+# كود تثبيت FFmpeg تلقائياً عند التشغيل
+def install_ffmpeg():
+    if not os.path.exists('bin/ffmpeg'):
+        print("📥 جاري تثبيت FFmpeg... يرجى الانتظار")
+        os.makedirs('bin', exist_ok=True)
+        cmd = "curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ --strip-components=1 -C bin"
+        subprocess.run(cmd, shell=True)
+        print("✅ تم التثبيت بنجاح")
+
+install_ffmpeg()
+# إضافة مسار bin للـ PATH برمجياً
+os.environ["PATH"] += os.path.pathsep + os.path.join(os.getcwd(), 'bin')
 # --- الإعدادات ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DEVELOPER_ID = int(os.getenv("DEVELOPER_ID", "0"))
@@ -148,4 +161,5 @@ def main():
     updater.idle()
 
 if name == 'main':
+
     main()
