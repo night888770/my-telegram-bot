@@ -159,7 +159,7 @@ def main():
 
     dp.add_handler(MessageHandler(Filters.text & (~Filters.command), main_engine), group=1)
     dp.add_handler(CommandHandler("panel", admin_panel))
-    dp.add_handler(CommandHandler(["شغل", "play"], play_music))
+    dp.add_handler(CommandHandler("play", play_music))
     dp.add_handler(CallbackQueryHandler(button_handler))
     dp.add_handler(MessageHandler(Filters.regex(r'^اذاعة$'), broadcast_logic))
     dp.add_handler(MessageHandler(Filters.regex(r'^تتبع'), text_commands))
@@ -170,6 +170,7 @@ def main():
 if __name__ == '__main__':
 
     main()
+
 
 
 
