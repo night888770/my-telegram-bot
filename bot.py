@@ -87,7 +87,7 @@ def give_nickname(update, context):
     else:
             update.message.reply_text("الرجاء الرد على رسالة الشخص الذي تريد إهداءه لقباً! 🎯")
     
-    def button_callback(update, context):
+def button_callback(update, context):
         query = update.callback_query
         data = query.data
     
@@ -426,3 +426,4 @@ def main():
 
 if __name__=="__main__":
     main()
+
