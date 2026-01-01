@@ -400,7 +400,7 @@ def main():
         print("❌ خطأ: BOT_TOKEN غير موجود!")
         return
 
-    ensure_downloads()
+   # ensure_downloads()
     updater = Updater(BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CallbackQueryHandler(button_callback))
@@ -426,6 +426,7 @@ def main():
 
 if __name__=="__main__":
     main()
+
 
 
 
