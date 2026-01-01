@@ -72,7 +72,8 @@ def start(update: Update, context: CallbackContext):
         "فقط أرسل لي: /play متبوعاً باسم المقطع."
     )
     update.message.reply_text(welcome_text, parse_mode='Markdown')
-def admin_help(update: Update, context: CallbackContext):
+    
+    def admin_help(update: Update, context: CallbackContext):
     """دليل أوامر المطور"""
     if update.effective_user.id != DEVELOPER_ID:
         return
@@ -207,7 +208,7 @@ def main():
     dp = updater.dispatcher
 dp.add_handler(CommandHandler("stats", stats))
     dp.add_handler(CommandHandler("broadcast", broadcast))
-    dp.add_handler(CommandHandler("clean", clean_files))
+dp.add_handler(CommandHandler("clean", clean_manual))
     dp.add_handler(CommandHandler("admin", admin_help))
 
     # 3. الألعاب والردود (يجب أن تكون في النهاية)
@@ -226,3 +227,4 @@ if __name__ == "__main__":
 
     
     main()
+
