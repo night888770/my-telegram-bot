@@ -5,7 +5,7 @@ import random
 import importlib
 import sys
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 # ---------------------------------------------------------
@@ -426,6 +426,7 @@ def main():
 
 if __name__=="__main__":
     main()
+
 
 
 
