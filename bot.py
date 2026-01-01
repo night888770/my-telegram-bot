@@ -46,7 +46,24 @@ logging.basicConfig(
 logger = logging.getLogger("LolyBot")
 # القيمة True تعني أن الترفيه يعمل، و False تعني أنه معطل
 entertainment_enabled = True
-
+def admin_panel(update, context):
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # الحصول على معلومات العضو في هذه المجموعة 🔍
+    member = context.bot.get_chat_member(chat_id, user_id)
+    
+    # التحقق: هل هو المطور أو مشرف أو صاحب المجموعة؟
+    if member.status in ['administrator', 'creator'] or user_id == DEVELOPER_ID:
+        # هنا نضع كود إظهار الأزرار الذي كتبناه سابقاً ⬇️
+        keyboard = [
+            [InlineKeyboardButton("👮 الإشراف", callback_data='admin_list')],
+            [InlineKeyboardButton("❌ إغلاق", callback_data='close_menu')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text("🎮 لوحة تحكم المشرفين:", reply_markup=reply_markup)
+    else:
+        update.message.reply_text("🚫 عذراً، هذه اللوحة للمشرفين فقط!")
 def untrack(update, context):
     # حماية المطور: التأكد أنك أنت من يرسل الأمر 🔐
     if update.effective_user.id != DEVELOPER_ID:
@@ -404,6 +421,7 @@ def main():
     updater = Updater(BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CallbackQueryHandler(button_callback))
+    dp.add_handler(CommandHandler("admin", admin_panel))
     dp.add_handler(CommandHandler("track", track))
     dp.add_handler(CommandHandler("untrack", untrack))
     dp.add_handler(CommandHandler("start", start))
@@ -426,6 +444,7 @@ def main():
 
 if __name__=="__main__":
     main()
+
 
 
 
