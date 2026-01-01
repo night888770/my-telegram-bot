@@ -47,24 +47,23 @@ entertainment_enabled = True
 def ensure_downloads():
     if not os.path.exists(DOWNLOADS_DIR):
         os.makedirs(DOWNLOADS_DIR, exist_ok=True)
-        def untrack(update, context):
-    # 🔐 حماية المطور: التأكد أنك أنت من يرسل الأمر
+     def untrack(update, context):
+    # حماية المطور: التأكد أنك أنت من يرسل الأمر 🔐
     if update.effective_user.id != DEVELOPER_ID:
-        return 
+        return # هذه الكلمة يجب أن تكون مزاحة بمسافتين (2 Tabs) عن بداية السطر
 
     try:
-        # تحويل النص المكتوب بعد الأمر إلى رقم (ID)
+        # تحويل النص المكتوب بعد الأمر إلى رقم (ID) 🆔
         target_id = int(context.args[0])
         
-        # التأكد أولاً أن الرقم موجود في القائمة قبل حذفه
         if target_id in tracked_users:
             tracked_users.remove(target_id)
-            update.message.reply_text(f"❌ تم إزالة {target_id} من الرادار.")
+            update.message.reply_text(f"✅ تم إلغاء مراقبة الحساب: {target_id}")
         else:
-            update.message.reply_text("هذا الأيدي غير موجود في القائمة أصلاً.")
+            update.message.reply_text("⚠️ هذا الحساب غير موجود في قائمة المراقبة.")
             
     except (IndexError, ValueError):
-        update.message.reply_text("اكتب الأمر بهذا الشكل: /untrack 12345")
+        update.message.reply_text("❌ يرجى كتابة الآيدي بشكل صحيح بعد الأمر.\nمثال: /untrack 123456 ")
 
 def give_nickname(update, context):
     # 1. التأكد أن المستخدم قام بالرد على رسالة شخص آخر
@@ -423,6 +422,7 @@ def main():
 
 if __name__=="__main__":
     main()
+
 
 
 
