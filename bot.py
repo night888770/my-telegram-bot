@@ -185,36 +185,50 @@ def games(update: Update, context: CallbackContext):
 
 
 def play_music(update: Update, context: CallbackContext):
-    """دالة البحث والتحميل والمعالجة (مبسط)"""
+    """دالة البحث والتحميل والمعالجة الحقيقية"""
     query = " ".join(context.args or [])
     if not query:
-        update.message.reply_text(
-            "💡 من فضلك، أخبر لولي ماذا تريدين أن تسمعي؟\nمثال: /play blinding lights")
+        update.message.reply_text(f"💡 من فضلك، أخبري {BOT_NAME} ماذا تريدين أن تسمعي؟\nمثال: /play سورة الكهف", parse_mode='Markdown')
         return
 
     progress_msg = update.message.reply_text(f"🔍 {BOT_NAME} تبحث الآن... يرجى الانتظار ثوانٍ.")
     ensure_downloads()
 
-    # إعدادات yt-dlp (إن رغبت بالتحميل الحقيقي فعّل yt-dlp)
     ydl_opts = {
         'format': 'bestaudio/best',
         'quiet': True,
         'no_warnings': True,
+        'source_address': '0.0.0.0',
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
         'outtmpl': f'{DOWNLOADS_DIR}/%(title)s.%(ext)s',
     }
 
-    # لا نقوم بالتحميل فعلياً هنا لتجنب الأخطاء في بيئات بدون yt-dlp
-    update.message.reply_text("✅ تم العثور على المقطع (محاكاة). لتنفيذ التحميل تأكد من تثبيت yt-dlp.")
-
+    try:
+        import yt_dlp
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch:{query}", download=True)['entries'][0]
+            file_path = ydl.prepare_filename(info)
+            
+        update.message.reply_audio(
+            audio=open(file_path, 'rb'),
+            title=info.get('title', 'Audio'),
+            caption=f"تم التحميل بواسطة {BOT_NAME} 🎀"
+        )
+        
+        if os.path.exists(file_path):
+            os.remove(file_path) # تنظيف تلقائي فورياً
+        progress_msg.delete()
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        update.message.reply_text(f"❌ اعتذر منكِ، واجهتُ مشكلة في التحميل.\nالسبب: {str(e)}")
 
 def main():
     if not BOT_TOKEN:
-        print("❌ خطأ: BOT_TOKEN غير موجود في متغيرات البيئة!")
+        print("❌ خطأ: BOT_TOKEN غير موجود!")
         return
 
     ensure_downloads()
-
-    updater = Updater(BOT_TOKEN)
+    updater = Updater(BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
@@ -224,14 +238,12 @@ def main():
     dp.add_handler(CommandHandler("admin", admin_help))
     dp.add_handler(CommandHandler("play", play_music))
 
-    # الألعاب والردود (في النهاية)
     dp.add_handler(MessageHandler(Filters.regex(r'(نرد|حظي)'), games))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, smart_responses))
 
-    print("🚀 لولي جاهزة للعب والعمل الآن!")
+    print(f"🚀 {BOT_NAME} جاهزة للعمل الآن!")
     updater.start_polling()
     updater.idle()
 
-
-if __name__ == "__main__":
+if name == "main":
     main()
