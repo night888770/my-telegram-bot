@@ -1,10 +1,9 @@
 import os
 import logging
 import threading
+import subprocess
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
-import subprocess
-
 # كود تثبيت FFmpeg تلقائياً عند التشغيل
 def install_ffmpeg():
     if not os.path.exists('bin/ffmpeg'):
@@ -163,3 +162,4 @@ def main():
 if name == 'main':
 
     main()
+
