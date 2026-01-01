@@ -1,178 +1,228 @@
 import os
 import logging
-import threading
 import subprocess
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
-# كود تثبيت FFmpeg تلقائياً عند التشغيل
-def install_ffmpeg():
-    if not os.path.exists('bin/ffmpeg'):
-        print("📥 جاري تثبيت FFmpeg... يرجى الانتظار")
-        os.makedirs('bin', exist_ok=True)
-        # الرابط المباشر الصحيح
-        cmd = "curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ --strip-components=1 -C bin"
-        subprocess.run(cmd, shell=True)
-        print("✅ تم التثبيت بنجاح")
+import random
+import shutil
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+
+# ---------------------------------------------------------
+# المرحلة الأولى: إعداد البيئة وتثبيت الملحقات (FFmpeg)
+# ---------------------------------------------------------
 try:
     from static_ffmpeg import add_paths as ffmpeg_add_paths
     ffmpeg_add_paths()
 except ImportError:
+    # في حال عدم وجود المكتبة، يتم تثبيتها وتشغيلها لضمان عمل المعالج الصوتي
     subprocess.run(["pip", "install", "static-ffmpeg"])
     from static_ffmpeg import add_paths as ffmpeg_add_paths
     ffmpeg_add_paths()
+USER_FILE = "users.txt"
 
-print("✅ FFmpeg جاهز للعمل")
-# إضافة مسار bin للـ PATH برمجياً
-os.environ["PATH"] += os.path.pathsep + os.path.join(os.getcwd(), 'bin')
-# --- الإعدادات ---
+def log_user(user_id):
+    """حفظ آيدي المستخدم الجديد"""
+    if not os.path.exists(USER_FILE):
+        open(USER_FILE, "w").close()
+    
+    with open(USER_FILE, "r") as f:
+        users = f.read().splitlines()
+    
+    if str(user_id) not in users:
+        with open(USER_FILE, "a") as f:
+            f.write(f"{user_id}\n")
+
+def stats(update: Update, context: CallbackContext):
+    """عرض عدد المستخدمين للمطور فقط"""
+    if update.effective_user.id != DEVELOPER_ID:
+        return
+    
+    if os.path.exists(USER_FILE):
+        with open(USER_FILE, "r") as f:
+            count = len(f.read().splitlines())
+        update.message.reply_text(f"📊 إحصائيات لولي:\nعدد المستخدمين: {count}")
+    else:
+        update.message.reply_text("📊 لا يوجد مستخدمين بعد.")
+# إعداد السجلات (Logging) لمراقبة أداء "لولي"
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger("LolyBot")
+
+# ---------------------------------------------------------
+# المرحلة الثانية: استيراد بيانات الاعتماد من Railway
+# ---------------------------------------------------------
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DEVELOPER_ID = int(os.getenv("DEVELOPER_ID", "0"))
+BOT_NAME = "لولي"
 
-# تخزين البيانات في الذاكرة (يفضل مستقبلاً ربطها بقاعدة بيانات)
-SPY_LIST = [] 
-GROUPS_LIST = set() 
-SPY_STATUS = True
-
-# إعداد السجلات
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-
-# --- 1. محرك التتبع وتسجيل المجموعات ---
-def main_engine(update: Update, context: CallbackContext):
-    global SPY_STATUS, SPY_LIST, GROUPS_LIST
+# ---------------------------------------------------------
+# المرحلة الثالثة: الدوال التشغيلية (Logic)
+# ---------------------------------------------------------
+def get_support_buttons():
+    keyboard = [
+        [InlineKeyboardButton("🌟 قيم البوت", url="https://t.me/BotFather")],
+        [InlineKeyboardButton("👨‍💻 المطور", url=f"tg://user?id={DEVELOPER_ID}")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+def start(update: Update, context: CallbackContext):
+    """دالة الترحيب الخاصة بالبوت لولي"""
+    user_name = update.effective_user.first_name
+    welcome_text = (
+        f"أهلاً بك يا {user_name}! ✨\n"
+        f"أنا صديقتك  {BOT_NAME}.\n\n"
+        "أستطيع تحميل الصوتيات من اليوتيوب وبجودة عالية.\n"
+        "فقط أرسل لي: /play متبوعاً باسم المقطع."
+    )
+    update.message.reply_text(welcome_text, parse_mode='Markdown')
+def admin_help(update: Update, context: CallbackContext):
+    """دليل أوامر المطور"""
+    if update.effective_user.id != DEVELOPER_ID:
+        return
     
-    chat = update.effective_chat
-    user = update.effective_user
-    
-    # تسجيل المجموعات تلقائياً
-    if chat and chat.type in ['group', 'supergroup']:
-        GROUPS_LIST.add(chat.id)
+    help_text = (
+        "🛠 لوحة تحكم لولي:\n\n"
+        "📊 /stats - لعرض عدد المستخدمين\n"
+        "📢 /broadcast - لإرسال رسالة للجميع\n"
+        "🧹 /clean - لتنظيف الملفات المؤقتة"
+    )
+    update.message.reply_text(help_text, parse_mode='Markdown')
+    def smart_responses(update: Update, context: CallbackContext):
+    """نظام الردود التلقائية الذكي"""
+    text = update.message.text.lower()
+    user_name = update.effective_user.first_name
 
-    # نظام التتبع السري (للمطور فقط)
-    if SPY_STATUS and user and user.id in SPY_LIST:
-        if update.message:
-            report = (f"🕵️‍♂️ تنبيه تتبع:\n"
-                      f"👤 الاسم: {user.first_name}\n"
-                      f"🆔 الآيدي: {user.id}\n"
-                      f"📍 المكان: {chat.title if chat.title else 'خاص'}\n")
-            
-            context.bot.send_message(chat_id=DEVELOPER_ID, text=report, parse_mode='Markdown')
-            context.bot.forward_message(chat_id=DEVELOPER_ID, 
-                                        from_chat_id=chat.id, 
-                                        message_id=update.message.message_id)
+    replies = {
+        "مرحبا": f"وعليكم السلام ورحمة الله وبركاته يا {user_name} ✨، كيف يمكن لـ لولي مساعدتك؟",
+        "شكرا": "العفو! هذا واجبي دائماً 🎀",
+        "لولي": "نعم! أنا هنا، هل تريدين تحميل مقطع جديد؟ 🎶",
+        "تحبك": "وأنا أحبكم جميعاً! شكراً لثقتكم بـ لولي 💖",
+    }
 
-# --- 2. ميزة الإذاعة (Broadcast) للمطور ---
-def broadcast_logic(update: Update, context: CallbackContext):
-    if update.effective_user.id != DEVELOPER_ID: return
+    for key, response in replies.items():
+        if key in text:
+            update.message.reply_text(response)
+            return
+def clean_manual(update: Update, context: CallbackContext):
+    """تنظيف الوسائط (للمطور ومشرفي القروبات)"""
+    user_id = update.effective_user.id
+    chat_type = update.effective_chat.type
     
-    if not update.message.reply_to_message:
-        update.message.reply_text("❌ قم بالرد على الرسالة التي تريد إذاعتها بكلمة 'اذاعة'.")
+    # التحقق من الصلاحية: هل هو المطور؟
+    is_developer = (user_id == DEVELOPER_ID)
+    
+    # التحقق من الصلاحية: هل هو مشرف في القروب؟
+    is_admin = False
+    if chat_type in ['group', 'supergroup']:
+        member = context.bot.get_chat_member(update.effective_chat.id, user_id)
+        if member.status in ['administrator', 'creator']:
+            is_admin = True
+
+    # إذا لم يكن مطوراً ولا مشرفاً، نرفض الطلب
+    if not is_developer and not is_admin:
+        update.message.reply_text("❌ عذراً، هذا الأمر مخصص للمطور ومشرفي المجموعة فقط.")
         return
 
-    msg = update.message.reply_to_message
-    success, failed = 0, 0
-    
-    for gid in list(GROUPS_LIST):
+    # تنفيذ عملية التنظيف
+    folder = 'downloads'
+    if os.path.exists(folder):
         try:
-            context.bot.copy_message(chat_id=gid, from_chat_id=msg.chat_id, message_id=msg.message_id)
-            success += 1
-        except:
-            failed += 1
-            GROUPS_LIST.discard(gid)
-
-    update.message.reply_text(f"📢 نتيجة الإذاعة:\n✅ نجاح: {success}\n❌ فشل: {failed}")
-
-# --- 3. تحميل الموسيقى (YouTube) ---
+            shutil.rmtree(folder)
+            os.makedirs(folder)
+            update.message.reply_text("🗑️ تم تنظيف ذاكرة الوسائط بنجاح بواسطة إدارة لولي.")
+        except Exception as e:
+            update.message.reply_text(f"⚠️ حدث خطأ أثناء التنظيف: {e}")
+    else:
+        update.message.reply_text("📁 المجلد نظيف بالفعل.")
+def clean_files(update: Update, context: CallbackContext):
+    """تنظيف مجلد التحميلات يدوياً"""
+    if update.effective_user.id != DEVELOPER_ID: return
+    
+    if os.path.exists("downloads"):
+        import shutil
+        shutil.rmtree("downloads")
+        os.makedirs("downloads")
+        update.message.reply_text("✅ تم تنظيف السيرفر وحذف جميع الملفات المؤقتة.")
+        def games(update: Update, context: CallbackContext):
+    """لعبة حجر ورقة مقص أو رمي النرد"""
+    cmd = update.message.text.split()[0]
+    
+    if "نرد" in cmd:
+        score = random.randint(1, 6)
+        update.message.reply_dice() # يرسل إيموجي نرد متحرك حقيقي
+        update.message.reply_text(f"حظك اليوم هو: {score} 🎲")
+    
+    elif "حظي" in cmd:
+        fortunes = ["يومك سعيد جداً 🌟", "ستسمع خبراً جميلاً 🌸", "تحلَّ بالصبر قليلاً ⏳", "مفاجأة في الطريق إليك 🎁"]
+        update.message.reply_text(f"توقعي لكِ اليوم: {random.choice(fortunes)}")
 def play_music(update: Update, context: CallbackContext):
-    from yt_dlp import YoutubeDL
+    """دالة البحث والتحميل والمعالجة"""
     query = " ".join(context.args)
     if not query:
-        update.message.reply_text("اكتب اسم الأغنية بعد الأمر، مثال: /شغل يانبي سلام عليك")
+        update.message.reply_text("💡 من فضلك، أخبر لولي ماذا تريدين أن تسمعي؟\nمثال: /play blinding lights")
         return
 
-    status_msg = update.message.reply_text("⏳ جاري البحث والتحميل...")
-    
+    progress_msg = update.message.reply_text(f"🔍 {BOT_NAME} تبحث الآن... يرجى الانتظار ثوانٍ.")
+
+    # إعدادات yt-dlp الاحترافية لتجاوز الحظر (Error 403)
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'quiet': True,
+        'no_warnings': True,
+        'source_address': '0.0.0.0', # لتفادي مشاكل الـ IP
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'outtmpl': 'downloads/%(title)s.%(ext)s',
+    }
+
     try:
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': 'downloads/%(title)s.%(ext)s',
-            'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}],
-            'quiet': True
-        }
-        with YoutubeDL(ydl_opts) as ydl:
+        import yt_dlp
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # البحث عن أول نتيجة
             info = ydl.extract_info(f"ytsearch:{query}", download=True)['entries'][0]
-            file_path = ydl.prepare_filename(info).rsplit('.', 1)[0] + ".mp3"
-            update.message.reply_audio(audio=open(file_path, 'rb'), title=info.get('title'))
+            file_path = ydl.prepare_filename(info)
+            
+        # إرسال الملف الصوتي للمستخدم
+        update.message.reply_audio(
+            audio=open(file_path, 'rb'),
+            title=info.get('title', 'Audio'),
+            caption=f"تم التحميل بواسطة {BOT_NAME} 🎀"
+        )
+        
+        # تنظيف الذاكرة وحذف الملف بعد الإرسال
+        if os.path.exists(file_path):
             os.remove(file_path)
-            status_msg.delete()
+        progress_msg.delete()
+
     except Exception as e:
-        status_msg.edit_text(f"❌ حدث خطأ: {str(e)}")
+        logger.error(f"Error in Loly: {e}")
+        update.message.reply_text(f"❌ اعتذر منكِ، واجهتُ صعوبة في الوصول للمقطع.\nالسبب: {str(e)}")
 
-# --- 4. لوحة تحكم المطور ---
-def admin_panel(update: Update, context: CallbackContext):
-    if update.effective_user.id != DEVELOPER_ID: return
-    
-    keyboard = [
-        [InlineKeyboardButton("➕ إضافة هدف", callback_data='add_id'),
-         InlineKeyboardButton("📋 قائمة التتبع", callback_data='show_spy')],
-        [InlineKeyboardButton("📢 إذاعة للمجموعات", callback_data='info_bc')],
-        [InlineKeyboardButton("✅ تشغيل" if not SPY_STATUS else "📴 إيقاف التتبع", callback_data='toggle_spy')]
-    ]
-    update.message.reply_text(f"🛠 لوحة التحكم للمطور\n👥 المجموعات النشطة: {len(GROUPS_LIST)}", 
-                             reply_markup=InlineKeyboardMarkup(keyboard))
+# ---------------------------------------------------------
+# المرحلة الرابعة: التشغيل الرئيسي (Main Entry)
+# ---------------------------------------------------------
 
-def button_handler(update: Update, context: CallbackContext):
-    global SPY_STATUS, SPY_LIST
-    query = update.callback_query
-    query.answer()
-    
-    if query.data == 'toggle_spy':
-        SPY_STATUS = not SPY_STATUS
-        query.edit_message_text(f"📢 حالة التتبع: {'شغال ✅' if SPY_STATUS else 'متوقف 📴'}")
-    elif query.data == 'show_spy':
-        msg = "📋 الأهداف الحالية:\n" + "\n".join([f"• {i}" for i in SPY_LIST]) if SPY_LIST else "لا يوجد أهداف."
-        query.edit_message_text(msg, parse_mode='Markdown')
-    elif query.data == 'info_bc':
-        query.edit_message_text("للإذاعة: قم بالرد على أي رسالة واكتب كلمة 'اذاعة'.")
-    elif query.data == 'add_id':
-        query.edit_message_text("أرسل الآيدي هكذا: تتبع 123456")
-
-# --- 5. أوامر نصية للمطور ---
-def text_commands(update: Update, context: CallbackContext):
-    if update.effective_user.id != DEVELOPER_ID: return
-    text = update.message.text
-    
-    if text.startswith("تتبع"):
-        try:
-            tid = int(text.split()[1])
-            if tid not in SPY_LIST:
-                SPY_LIST.append(tid)
-                update.message.reply_text(f"✅ تمت إضافة {tid} للتتبع.")
-        except:
-            update.message.reply_text("❌ خطأ في الآيدي.")
-
-# --- تشغيل البوت ---
 def main():
-    if not os.path.exists('downloads'): os.makedirs('downloads')
-    
+    if not BOT_TOKEN:
+        print("❌ خطأ: BOT_TOKEN غير موجود في متغيرات Railway!")
+        return
+
     updater = Updater(BOT_TOKEN)
     dp = updater.dispatcher
+dp.add_handler(CommandHandler("stats", stats))
+    dp.add_handler(CommandHandler("broadcast", broadcast))
+    dp.add_handler(CommandHandler("clean", clean_files))
+    dp.add_handler(CommandHandler("admin", admin_help))
 
-    dp.add_handler(MessageHandler(Filters.text & (~Filters.command), main_engine), group=1)
-    dp.add_handler(CommandHandler("panel", admin_panel))
-    dp.add_handler(CommandHandler("play", play_music))
-    dp.add_handler(CallbackQueryHandler(button_handler))
-    dp.add_handler(MessageHandler(Filters.regex(r'^اذاعة$'), broadcast_logic))
-    dp.add_handler(MessageHandler(Filters.regex(r'^تتبع'), text_commands))
+    # 3. الألعاب والردود (يجب أن تكون في النهاية)
+    dp.add_handler(MessageHandler(Filters.regex(r'(نرد|حظي)'), games))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, smart_responses))
 
+    print("🚀 لولي جاهزة للعب والعمل الآن!")
+    
     updater.start_polling()
     updater.idle()
 
 if __name__ == "__main__":
 
+
+
+
+    
     main()
-
-
-
-
-
-
