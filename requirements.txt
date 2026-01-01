@@ -1,3 +1,4 @@
 python-telegram-bot==13.13
 urllib3==1.26.15
+static-ffmpeg
 yt-dlp
