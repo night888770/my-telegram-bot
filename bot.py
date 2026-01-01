@@ -133,7 +133,6 @@ def admin_help(update: Update, context: CallbackContext):
         "🧹 /clean - لتنظيف الملفات المؤقتة"
     )
     update.message.reply_text(help_text)
-
 def smart_responses(update: Update, context: CallbackContext):
     """نظام الردود التلقائية الذكي"""
     if not update.message or not update.message.text:
@@ -245,5 +244,6 @@ def main():
     updater.start_polling()
     updater.idle()
 
-if name == "main":
+if __name__ == "__main__":
     main()
+
