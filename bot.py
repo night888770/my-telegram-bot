@@ -47,9 +47,9 @@ entertainment_enabled = True
 def ensure_downloads():
     if not os.path.exists(DOWNLOADS_DIR):
         os.makedirs(DOWNLOADS_DIR, exist_ok=True)
-     def untrack(update, context):
+def untrack(update, context):
     # حماية المطور: التأكد أنك أنت من يرسل الأمر 🔐
-    if update.effective_user.id != DEVELOPER_ID:
+        if update.effective_user.id != DEVELOPER_ID:
         return # هذه الكلمة يجب أن تكون مزاحة بمسافتين (2 Tabs) عن بداية السطر
 
     try:
@@ -422,6 +422,7 @@ def main():
 
 if __name__=="__main__":
     main()
+
 
 
 
