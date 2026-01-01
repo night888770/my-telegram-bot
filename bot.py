@@ -6,6 +6,7 @@ import importlib
 import sys
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 # ---------------------------------------------------------
 # المرحلة الأولى: إعداد البيئة وتثبيت الملحقات (FFmpeg)
@@ -40,7 +41,8 @@ DOWNLOADS_DIR = "downloads"
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger("LolyBot")
-
+# القيمة True تعني أن الترفيه يعمل، و False تعني أنه معطل
+entertainment_enabled = True
 
 def ensure_downloads():
     if not os.path.exists(DOWNLOADS_DIR):
@@ -63,6 +65,67 @@ def ensure_downloads():
             
     except (IndexError, ValueError):
         update.message.reply_text("اكتب الأمر بهذا الشكل: /untrack 12345")
+
+def give_nickname(update, context):
+    # 1. التأكد أن المستخدم قام بالرد على رسالة شخص آخر
+    if update.message.reply_to_message:
+        target_user = update.message.reply_to_message.from_user
+        giver_user = update.effective_user
+        
+        # 2. اختيار لقب عشوائي من القائمة التي جهزناها سابقاً
+        random_nickname = random.choice(nicknames_list)
+        
+        # 3. صياغة الرسالة
+        response = (
+            f"🎁 قام {giver_user.first_name} بإهداء لقب لـ {target_user.first_name}\n"
+            f"✨ اللقب هو: {random_nickname}"
+        )
+        
+        update.message.reply_text(response, parse_mode='Markdown')
+    else:
+        update.message.reply_text("الرجاء الرد على رسالة الشخص الذي تريد إهداءه لقباً! 🎯")
+        def button_callback(update, context):
+    query = update.callback_query
+    data = query.data
+    
+    # إشعار التليجرام بأن الضغطة تمت بنجاح
+    query.answer()
+
+    if data == 'admin_list':
+        # عرض أوامر الإشراف مع زر للعودة
+        admin_text = (
+            "👮 قائمة أوامر الإشراف:\n\n"
+            "• /pin : تثبيت رسالة (بالرد عليها) 📌\n"
+            "• /muteall : كتم العضو تماماً 🤐\n"
+            "• /unmute : فك كتم العضو 🔓\n"
+            "• /kick : طرد العضو من المجموعة 👞\n"
+            "• /clean : تنظيف الملفات المؤقتة 🧹"
+        )
+        keyboard = [[InlineKeyboardButton("🔙 العودة للقائمة", callback_data='main_menu')]]
+        query.edit_message_text(text=admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+
+    elif data == 'fun_list':
+        # عرض أوامر الترفيه بناءً على حالة المفتاح
+        if entertainment_enabled:
+            fun_text = (
+                "🎮 قائمة أوامر الترفيه:\n\n"
+                "• /give : إهداء لقب عشوائي لصديق 🎁\n"
+                "• /stats : عرض إحصائياتك 📊\n"
+                "• /play : تشغيل موسيقى (إذا كان مدعوماً) 🎵"
+            )
+        else:
+            fun_text = "🚫 عذراً: أوامر الترفيه معطلة حالياً من قبل الإدارة."
+            
+        keyboard = [[InlineKeyboardButton("🔙 العودة للقائمة", callback_data='main_menu')]]
+        query.edit_message_text(text=fun_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+
+    elif data == 'main_menu':
+        # العودة للواجهة الأساسية التي صممناها سابقاً
+        # سنعيد إرسال نفس أزرار القائمة الرئيسية
+        query.edit_message_text(
+            text="✨ أهلاً بك في لوحة تحكم لولي!\nإختر القسم الذي تريد استكشافه:",
+            reply_markup=main_menu_keyboard() # نفترض أننا وضعنا الأزرار في دالة منفصلة
+        )
 def track(update, context):
     # 🔐 حماية: التأكد أنك المطور (المعرف مسحوب من Railway)
     if update.effective_user.id != DEVELOPER_ID:
@@ -92,7 +155,35 @@ def log_user(user_id):
     if str(user_id) not in users:
         with open(USER_FILE, "a") as f:
             f.write(f"{user_id}\n")
+from telegram import ChatPermissions
 
+def mute_all(update, context):
+    # 👮 التأكد من أن المنفذ هو مشرف
+    user_status = context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id).status
+    if user_status not in ['administrator', 'creator']:
+        return 
+
+    # 🎯 التحقق من وجود رد على رسالة الشخص المستهدف
+    if update.message.reply_to_message:
+        target_id = update.message.reply_to_message.from_user.id
+        
+        # 🚫 ضبط كافة الصلاحيات على False
+        permissions = ChatPermissions(
+            can_send_messages=False,
+            can_send_media_messages=False,
+            can_send_polls=False,
+            can_send_other_messages=False,
+            can_add_web_page_previews=False,
+            can_change_info=False,
+            can_invite_users=False,
+            can_pin_messages=False
+        )
+        
+        # ⛓️ تطبيق القيود
+        context.bot.restrict_chat_member(update.effective_chat.id, target_id, permissions=permissions)
+        update.message.reply_text("🚫 تم إلغاء كافة صلاحيات العضو بنجاح.")
+    else:
+        update.message.reply_text("يرجى الرد على رسالة العضو لإلغاء صلاحياته.")
 def stats(update: Update, context: CallbackContext):
     """عرض عدد المستخدمين للمطور فقط"""
     if not update.effective_user or update.effective_user.id != DEVELOPER_ID:
@@ -104,7 +195,25 @@ def stats(update: Update, context: CallbackContext):
         update.message.reply_text(f"📊 إحصائيات لولي:\nعدد المستخدمين: {count}")
     else:
         update.message.reply_text("📊 لا يوجد مستخدمين بعد.")
+def pin_message(update, context):
+    # 1. التأكد من أن مرسل الأمر مشرف 🛡️
+    user_id = update.effective_user.id
+    user_status = context.bot.get_chat_member(update.effective_chat.id, user_id).status
+    if user_status not in ['administrator', 'creator'] and user_id != DEVELOPER_ID:
+        return 
 
+    # 2. التحقق من وجود رد على الرسالة المراد تثبيتها 📌
+    if update.message.reply_to_message:
+        message_id = update.message.reply_to_message.message_id
+        
+        # تنفيذ التثبيت
+        try:
+            context.bot.pin_chat_message(update.effective_chat.id, message_id)
+            update.message.reply_text("📌 تم تثبيت الرسالة بنجاح.")
+        except Exception as e:
+            update.message.reply_text(f"❌ حدث خطأ: {e}")
+    else:
+        update.message.reply_text("يرجى الرد على الرسالة التي تريد تثبيتها!")
 def broadcast(update: Update, context: CallbackContext):
     """إرسال رسالة للجميع (للمطور فقط)"""
     if not update.effective_user or update.effective_user.id != DEVELOPER_ID:
@@ -124,7 +233,33 @@ def broadcast(update: Update, context: CallbackContext):
             except Exception:
                 continue
     update.message.reply_text("✅ تم إرسال الرسالة إلى جميع المستخدمين.")
+from telegram import ChatPermissions
 
+def unmute_user(update, context):
+    # 👮 التأكد من أن المنفذ هو مشرف في المجموعة
+    user_status = context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id).status
+    if user_status not in ['administrator', 'creator']:
+        return 
+
+    # 🎯 التحقق من وجود رد على رسالة العضو المراد فك تقييده
+    if update.message.reply_to_message:
+        target_id = update.message.reply_to_message.from_user.id
+        
+        # ✅ إعادة تفعيل كافة الصلاحيات
+        permissions = ChatPermissions(
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_polls=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True,
+            can_invite_users=True
+        )
+        
+        # 🔓 تنفيذ فك التقييد
+        context.bot.restrict_chat_member(update.effective_chat.id, target_id, permissions=permissions)
+        update.message.reply_text("✅ تم فك التقييد عن العضو، يمكنه الآن التفاعل.")
+    else:
+        update.message.reply_text("يرجى الرد على رسالة العضو لفك تقييده.")
 def start(update: Update, context: CallbackContext):
     """دالة الترحيب الخاصة بالبوت لولي"""
     user = update.effective_user
@@ -141,7 +276,22 @@ def start(update: Update, context: CallbackContext):
         "فقط أرسل لي: /play متبوعاً باسم المقطع."
     )
     update.message.reply_text(welcome_text)
+def toggle_fun(update, context):
+    global entertainment_enabled
+    
+    # 👮 التأكد من أن المستخدم مشرف
+    user_status = context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id).status
+    if user_status not in ['administrator', 'creator']:
+        return
 
+    command = update.message.text.split()[0] # الحصول على اسم الأمر
+    
+    if "disable" in command:
+        entertainment_enabled = False
+        update.message.reply_text("🚫 تم تعطيل أوامر الترفيه في هذه المجموعة.")
+    else:
+        entertainment_enabled = True
+        update.message.reply_text("✅ تم تفعيل أوامر الترفيه مرة أخرى!")
 def admin_help(update: Update, context: CallbackContext):
     """دليل أوامر المطور"""
     if not update.effective_user or update.effective_user.id != DEVELOPER_ID:
@@ -208,7 +358,7 @@ def play_music(update: Update, context: CallbackContext):
     """دالة البحث والتحميل والمعالجة الحقيقية"""
     query = " ".join(context.args or [])
     if not query:
-        update.message.reply_text(f"💡 من فضلك، أخبري {BOT_NAME} ماذا تريدين أن تسمعي؟\nمثال: /play سورة الكهف", parse_mode='Markdown')
+        update.message.reply_text(f"💡 من فضلك، أخبري {BOT_NAME} ماذا تريدين أن تسمعي؟\nمثال: /play save your tears", parse_mode='Markdown')
         return
 
     progress_msg = update.message.reply_text(f"🔍 {BOT_NAME} تبحث الآن... يرجى الانتظار ثوانٍ.")
@@ -250,24 +400,30 @@ def main():
     ensure_downloads()
     updater = Updater(BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
+    dp.add_handler(CallbackQueryHandler(button_callback))
     dp.add_handler(CommandHandler("track", track))
     dp.add_handler(CommandHandler("untrack", untrack))
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("stats", stats))
+    dp.add_handler(CommandHandler("pin", pin_message))
     dp.add_handler(CommandHandler("broadcast", broadcast))
+    dp.add_handler(CommandHandler("enable_fun", toggle_fun))
+    dp.add_handler(CommandHandler("disable_fun", toggle_fun))
     dp.add_handler(CommandHandler("clean", clean_files))
     dp.add_handler(CommandHandler("admin", admin_help))
+    dp.add_handler(CommandHandler("give", give_nickname))
     dp.add_handler(CommandHandler("play", play_music))
-
+    dp.add_handler(CommandHandler("muteall", mute_all))
     dp.add_handler(MessageHandler(Filters.regex(r'(نرد|حظي)'), games))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, smart_responses))
-
+    dp.add_handler(CommandHandler("unmute", unmute_user))
     print(f"🚀 {BOT_NAME} جاهزة للعمل الآن!")
     updater.start_polling()
     updater.idle()
 
 if __name__=="__main__":
     main()
+
 
 
 
