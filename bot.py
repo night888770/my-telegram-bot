@@ -13,8 +13,15 @@ def install_ffmpeg():
         cmd = "curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ --strip-components=1 -C bin"
         subprocess.run(cmd, shell=True)
         print("✅ تم التثبيت بنجاح")
-        
-install_ffmpeg()
+try:
+    from static_ffmpeg import add_paths as ffmpeg_add_paths
+    ffmpeg_add_paths()
+except ImportError:
+    subprocess.run(["pip", "install", "static-ffmpeg"])
+    from static_ffmpeg import add_paths as ffmpeg_add_paths
+    ffmpeg_add_paths()
+
+print("✅ FFmpeg جاهز للعمل")
 # إضافة مسار bin للـ PATH برمجياً
 os.environ["PATH"] += os.path.pathsep + os.path.join(os.getcwd(), 'bin')
 # --- الإعدادات ---
@@ -163,5 +170,6 @@ def main():
 if name == 'main':
 
     main()
+
 
 
