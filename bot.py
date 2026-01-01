@@ -2,24 +2,10 @@ import os
 import logging
 import subprocess
 import random
-from typing import Any, TYPE_CHECKING
-if TYPE_CHECKING:
-    # These imports are only for type checking to satisfy linters; they are not required at runtime.
-    from telegram import Update as _Update  # type: ignore
-    from telegram.ext import Updater as _Updater, CommandHandler as _CommandHandler, MessageHandler as _MessageHandler, Filters as _Filters, CallbackContext as _CallbackContext  # type: ignore
-    TELEGRAM_AVAILABLE = True
-else:
-    # Runtime: avoid importing telegram to prevent ImportError when package is absent.
-    _Update = _Updater = _CommandHandler = _MessageHandler = _Filters = _CallbackContext = None
-    TELEGRAM_AVAILABLE = False
-
-# Use Any for type hints to avoid unresolved import errors when the telegram package is unavailable.
-Update = Any
-CallbackContext = Any
-Updater = _Updater
-CommandHandler = _CommandHandler
-MessageHandler = _MessageHandler
-Filters = _Filters
+import importlib
+import sys
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # ---------------------------------------------------------
 # المرحلة الأولى: إعداد البيئة وتثبيت الملحقات (FFmpeg)
@@ -246,6 +232,7 @@ def main():
 
 if __name__=="__main__":
     main()
+
 
 
 
