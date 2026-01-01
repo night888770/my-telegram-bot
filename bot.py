@@ -37,6 +37,9 @@ BOT_NAME = os.getenv("BOT_NAME", "لولي")
 USER_FILE = "users.txt"
 DOWNLOADS_DIR = "downloads"
 
+# قائمة المستخدمين المراقبين مؤقتاً
+tracked_users = []
+
 # إعداد السجلات (Logging) لمراقبة أداء "لولي"
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -44,23 +47,23 @@ logger = logging.getLogger("LolyBot")
 # القيمة True تعني أن الترفيه يعمل، و False تعني أنه معطل
 entertainment_enabled = True
 
-def ensure_downloads():
-    if not os.path.exists(DOWNLOADS_DIR):
-        os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 def untrack(update, context):
     # حماية المطور: التأكد أنك أنت من يرسل الأمر 🔐
-        if update.effective_user.id != DEVELOPER_ID:
-            return # هذه الكلمة يجب أن تكون مزاحة بمسافتين (2 Tabs) عن بداية السطر
+    if update.effective_user.id != DEVELOPER_ID:
+        return  # هذه الكلمة يجب أن تكون مزاحة بمسافتين (2 Tabs) عن بداية السطر
 
-        try:
+    try:
         # تحويل النص المكتوب بعد الأمر إلى رقم (ID) 🆔
         target_id = int(context.args[0])
-        
+
         if target_id in tracked_users:
             tracked_users.remove(target_id)
             update.message.reply_text(f"✅ تم إلغاء مراقبة الحساب: {target_id}")
         else:
             update.message.reply_text("⚠️ هذا الحساب غير موجود في قائمة المراقبة.")
+
+    except (IndexError, ValueError):
+        update.message.reply_text("❌ يرجى كتابة الآيدي بشكل صحيح بعد الأمر.\nمثال: /untrack 123456 ")
             
     except (IndexError, ValueError):
         update.message.reply_text("❌ يرجى كتابة الآيدي بشكل صحيح بعد الأمر.\nمثال: /untrack 123456 ")
@@ -82,49 +85,50 @@ def give_nickname(update, context):
         
         update.message.reply_text(response, parse_mode='Markdown')
     else:
-        update.message.reply_text("الرجاء الرد على رسالة الشخص الذي تريد إهداءه لقباً! 🎯")
-        def button_callback(update, context):
-    query = update.callback_query
-    data = query.data
+            update.message.reply_text("الرجاء الرد على رسالة الشخص الذي تريد إهداءه لقباً! 🎯")
     
-    # إشعار التليجرام بأن الضغطة تمت بنجاح
-    query.answer()
-
-    if data == 'admin_list':
-        # عرض أوامر الإشراف مع زر للعودة
-        admin_text = (
-            "👮 قائمة أوامر الإشراف:\n\n"
-            "• /pin : تثبيت رسالة (بالرد عليها) 📌\n"
-            "• /muteall : كتم العضو تماماً 🤐\n"
-            "• /unmute : فك كتم العضو 🔓\n"
-            "• /kick : طرد العضو من المجموعة 👞\n"
-            "• /clean : تنظيف الملفات المؤقتة 🧹"
-        )
-        keyboard = [[InlineKeyboardButton("🔙 العودة للقائمة", callback_data='main_menu')]]
-        query.edit_message_text(text=admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
-
-    elif data == 'fun_list':
-        # عرض أوامر الترفيه بناءً على حالة المفتاح
-        if entertainment_enabled:
-            fun_text = (
-                "🎮 قائمة أوامر الترفيه:\n\n"
-                "• /give : إهداء لقب عشوائي لصديق 🎁\n"
-                "• /stats : عرض إحصائياتك 📊\n"
-                "• /play : تشغيل موسيقى (إذا كان مدعوماً) 🎵"
+    def button_callback(update, context):
+        query = update.callback_query
+        data = query.data
+    
+        # إشعار التليجرام بأن الضغطة تمت بنجاح
+        query.answer()
+    
+        if data == 'admin_list':
+            # عرض أوامر الإشراف مع زر للعودة
+            admin_text = (
+                "👮 قائمة أوامر الإشراف:\n\n"
+                "• /pin : تثبيت رسالة (بالرد عليها) 📌\n"
+                "• /muteall : كتم العضو تماماً 🤐\n"
+                "• /unmute : فك كتم العضو 🔓\n"
+                "• /kick : طرد العضو من المجموعة 👞\n"
+                "• /clean : تنظيف الملفات المؤقتة 🧹"
             )
-        else:
-            fun_text = "🚫 عذراً: أوامر الترفيه معطلة حالياً من قبل الإدارة."
-            
-        keyboard = [[InlineKeyboardButton("🔙 العودة للقائمة", callback_data='main_menu')]]
-        query.edit_message_text(text=fun_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
-
-    elif data == 'main_menu':
-        # العودة للواجهة الأساسية التي صممناها سابقاً
-        # سنعيد إرسال نفس أزرار القائمة الرئيسية
-        query.edit_message_text(
-            text="✨ أهلاً بك في لوحة تحكم لولي!\nإختر القسم الذي تريد استكشافه:",
-            reply_markup=main_menu_keyboard() # نفترض أننا وضعنا الأزرار في دالة منفصلة
-        )
+            keyboard = [[InlineKeyboardButton("🔙 العودة للقائمة", callback_data='main_menu')]]
+            query.edit_message_text(text=admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    
+        elif data == 'fun_list':
+            # عرض أوامر الترفيه بناءً على حالة المفتاح
+            if entertainment_enabled:
+                fun_text = (
+                    "🎮 قائمة أوامر الترفيه:\n\n"
+                    "• /give : إهداء لقب عشوائي لصديق 🎁\n"
+                    "• /stats : عرض إحصائياتك 📊\n"
+                    "• /play : تشغيل موسيقى (إذا كان مدعوماً) 🎵"
+                )
+            else:
+                fun_text = "🚫 عذراً: أوامر الترفيه معطلة حالياً من قبل الإدارة."
+                
+            keyboard = [[InlineKeyboardButton("🔙 العودة للقائمة", callback_data='main_menu')]]
+            query.edit_message_text(text=fun_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    
+        elif data == 'main_menu':
+            # العودة للواجهة الأساسية التي صممناها سابقاً
+            # سنعيد إرسال نفس أزرار القائمة الرئيسية
+            query.edit_message_text(
+                text="✨ أهلاً بك في لوحة تحكم لولي!\nإختر القسم الذي تريد استكشافه:",
+                reply_markup=main_menu_keyboard() # نفترض أننا وضعنا الأزرار في دالة منفصلة
+            )
 def track(update, context):
     # 🔐 حماية: التأكد أنك المطور (المعرف مسحوب من Railway)
     if update.effective_user.id != DEVELOPER_ID:
@@ -422,15 +426,3 @@ def main():
 
 if __name__=="__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
