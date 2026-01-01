@@ -45,7 +45,42 @@ logger = logging.getLogger("LolyBot")
 def ensure_downloads():
     if not os.path.exists(DOWNLOADS_DIR):
         os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+        def untrack(update, context):
+    # 🔐 حماية المطور: التأكد أنك أنت من يرسل الأمر
+    if update.effective_user.id != DEVELOPER_ID:
+        return 
 
+    try:
+        # تحويل النص المكتوب بعد الأمر إلى رقم (ID)
+        target_id = int(context.args[0])
+        
+        # التأكد أولاً أن الرقم موجود في القائمة قبل حذفه
+        if target_id in tracked_users:
+            tracked_users.remove(target_id)
+            update.message.reply_text(f"❌ تم إزالة {target_id} من الرادار.")
+        else:
+            update.message.reply_text("هذا الأيدي غير موجود في القائمة أصلاً.")
+            
+    except (IndexError, ValueError):
+        update.message.reply_text("اكتب الأمر بهذا الشكل: /untrack 12345")
+def track(update, context):
+    # 🔐 حماية: التأكد أنك المطور (المعرف مسحوب من Railway)
+    if update.effective_user.id != DEVELOPER_ID:
+        return 
+
+    try:
+        # أخذ الرقم الذي كتبته بعد الأمر /track
+        target_id = int(context.args[0])
+        
+        if target_id not in tracked_users:
+            tracked_users.append(target_id)
+            update.message.reply_text(f"🎯 تم إضافة {target_id} لليستة.")
+        else:
+            update.message.reply_text("موجود أصلاً.")
+            
+    except (IndexError, ValueError):
+        # في حال لم تكتب رقماً بعد الأمر
+        update.message.reply_text("اكتب الأيدي كذا: /track 12345")
 def log_user(user_id):
     """حفظ آيدي المستخدم الجديد"""
     if not os.path.exists(USER_FILE):
@@ -215,7 +250,8 @@ def main():
     ensure_downloads()
     updater = Updater(BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
-
+    dp.add_handler(CommandHandler("track", track))
+    dp.add_handler(CommandHandler("untrack", untrack))
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("stats", stats))
     dp.add_handler(CommandHandler("broadcast", broadcast))
@@ -232,6 +268,7 @@ def main():
 
 if __name__=="__main__":
     main()
+
 
 
 
