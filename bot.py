@@ -9,10 +9,11 @@ def install_ffmpeg():
     if not os.path.exists('bin/ffmpeg'):
         print("📥 جاري تثبيت FFmpeg... يرجى الانتظار")
         os.makedirs('bin', exist_ok=True)
+        # الرابط المباشر الصحيح
         cmd = "curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ --strip-components=1 -C bin"
         subprocess.run(cmd, shell=True)
         print("✅ تم التثبيت بنجاح")
-
+        
 install_ffmpeg()
 # إضافة مسار bin للـ PATH برمجياً
 os.environ["PATH"] += os.path.pathsep + os.path.join(os.getcwd(), 'bin')
@@ -162,4 +163,5 @@ def main():
 if name == 'main':
 
     main()
+
 
