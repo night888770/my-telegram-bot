@@ -73,8 +73,8 @@ def start(update: Update, context: CallbackContext):
     )
     update.message.reply_text(welcome_text, parse_mode='Markdown')
     
-    def admin_help(update: Update, context: CallbackContext):
-    """دليل أوامر المطور"""
+        def admin_help(update: Update, context: CallbackContext):
+        """دليل أوامر المطور"""
     if update.effective_user.id != DEVELOPER_ID:
         return
     
@@ -227,4 +227,5 @@ if __name__ == "__main__":
 
     
     main()
+
 
